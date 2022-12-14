@@ -71,7 +71,11 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public WalletDTO findById(Long id) {
         Optional<Wallet> wallet = walletRepository.findById(id);
-        return wallet.map(walletModelMapper::mapWalletEntityToWalletDTO).orElse(null);
+        return wallet.map(walletModelMapper::mapWalletEntityToWalletDTO).orElseThrow(
+                ()-> new AppRuntimeException(
+                        ErrorCode.W003,
+                        String.format("Wallet with given id: %d does not exist", id))
+        );
     }
 
     @Override

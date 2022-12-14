@@ -16,6 +16,7 @@ import pl.byczazagroda.trackexpensesappbackend.controller.WalletController;
 import pl.byczazagroda.trackexpensesappbackend.dto.CreateWalletDTO;
 import pl.byczazagroda.trackexpensesappbackend.dto.UpdateWalletDTO;
 import pl.byczazagroda.trackexpensesappbackend.dto.WalletDTO;
+import pl.byczazagroda.trackexpensesappbackend.exception.ApiExceptionBase;
 import pl.byczazagroda.trackexpensesappbackend.exception.AppRuntimeException;
 import pl.byczazagroda.trackexpensesappbackend.exception.ErrorCode;
 import pl.byczazagroda.trackexpensesappbackend.mapper.WalletModelMapper;
@@ -45,7 +46,9 @@ import static org.mockito.Mockito.when;
         (controllers = WalletController.class,
                 includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
                         WalletRepository.class,
-                        WalletServiceImpl.class}))
+                        WalletServiceImpl.class,
+                        ApiExceptionBase.class
+                }))
 class WalletServiceImplTest {
 
     private static final String NAME_OF_WALLET = "nameOfWallet";
@@ -56,6 +59,9 @@ class WalletServiceImplTest {
 
     @MockBean
     private WalletRepository walletRepository;
+
+    @MockBean
+    private ApiExceptionBase apiExceptionBase;
 
     @Autowired
     private WalletServiceImpl walletService;
@@ -122,68 +128,6 @@ class WalletServiceImplTest {
         Assertions.assertEquals(wallet.getId(), returnedWallet.id());
         Assertions.assertEquals(wallet.getName(), returnedWallet.name());
         Assertions.assertEquals(wallet.getCreationDate(), returnedWallet.creationDate());
-    }
-
-    @Test
-    void shouldThrowAnExceptionWhenNameIsEmpty() throws Exception {
-        // given
-        Instant creationTime = Instant.now();
-        String emptyName = "  ";
-        CreateWalletDTO createWalletDTO = new CreateWalletDTO(emptyName);
-        Wallet wallet = new Wallet(emptyName);
-        long id = 1L;
-        wallet.setId(id);
-        wallet.setCreationDate(creationTime);
-        WalletDTO walletDTO = new WalletDTO(id, emptyName, creationTime);
-
-        // when
-        when(walletRepository.save(any(Wallet.class))).thenReturn(wallet);
-        when(walletRepository.existsById(id)).thenReturn(true);
-        when(walletModelMapper.mapWalletEntityToWalletDTO(wallet)).thenReturn(walletDTO);
-
-        // then
-        Assertions.assertThrows(ConstraintViolationException.class, () -> walletService.createWallet(createWalletDTO));
-    }
-
-    @Test
-    void shouldThrowAnExceptionWhenNameIsNull() throws Exception {
-        // given
-        Instant creationTime = Instant.now();
-        CreateWalletDTO createWalletDTO = new CreateWalletDTO(null);
-        Wallet wallet = new Wallet(null);
-        long id = 1L;
-        wallet.setId(id);
-        wallet.setCreationDate(creationTime);
-        WalletDTO walletDTO = new WalletDTO(id, null, creationTime);
-
-        // when
-        when(walletRepository.save(any(Wallet.class))).thenReturn(wallet);
-        when(walletRepository.existsById(id)).thenReturn(true);
-        when(walletModelMapper.mapWalletEntityToWalletDTO(wallet)).thenReturn(walletDTO);
-
-        // then
-        Assertions.assertThrows(ConstraintViolationException.class, () -> walletService.createWallet(createWalletDTO));
-    }
-
-    @Test
-    void shouldThrowAnExceptionWhenNameIsTooLong() throws Exception {
-        // given
-        Instant creationTime = Instant.now();
-        String tooLongName = "This wallet name is too long, it contains over 20 characters";
-        CreateWalletDTO createWalletDTO = new CreateWalletDTO(tooLongName);
-        Wallet wallet = new Wallet(tooLongName);
-        long id = 1L;
-        wallet.setId(id);
-        wallet.setCreationDate(creationTime);
-        WalletDTO walletDTO = new WalletDTO(id, tooLongName, creationTime);
-
-        // when
-        when(walletRepository.save(any(Wallet.class))).thenReturn(wallet);
-        when(walletRepository.existsById(id)).thenReturn(true);
-        when(walletModelMapper.mapWalletEntityToWalletDTO(wallet)).thenReturn(walletDTO);
-
-        // then
-        Assertions.assertThrows(ConstraintViolationException.class, () -> walletService.createWallet(createWalletDTO));
     }
 
     @Test

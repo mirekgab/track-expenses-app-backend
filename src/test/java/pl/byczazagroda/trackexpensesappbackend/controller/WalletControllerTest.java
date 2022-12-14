@@ -22,6 +22,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import pl.byczazagroda.trackexpensesappbackend.dto.CreateWalletDTO;
 import pl.byczazagroda.trackexpensesappbackend.dto.UpdateWalletDTO;
 import pl.byczazagroda.trackexpensesappbackend.dto.WalletDTO;
+import pl.byczazagroda.trackexpensesappbackend.exception.ApiExceptionBase;
+import pl.byczazagroda.trackexpensesappbackend.exception.AppRuntimeException;
+import pl.byczazagroda.trackexpensesappbackend.exception.ErrorCode;
+import pl.byczazagroda.trackexpensesappbackend.exception.GlobalControllerExceptionHandler;
 import pl.byczazagroda.trackexpensesappbackend.mapper.WalletModelMapper;
 import pl.byczazagroda.trackexpensesappbackend.service.WalletService;
 import pl.byczazagroda.trackexpensesappbackend.service.WalletServiceImpl;
@@ -42,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers = WalletController.class,
         excludeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = WalletServiceImpl.class),
         includeFilters = @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
-                WalletModelMapper.class}))
+                WalletModelMapper.class, ApiExceptionBase.class}))
 @ActiveProfiles("test")
 class WalletControllerTest {
 
@@ -331,7 +335,6 @@ class WalletControllerTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(header().string("message", LIST_OF_WALLETS_HEADER_MSG))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.size()").value(3))
                 .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(ID_OF_WALLET_1))
                 .andExpect(MockMvcResultMatchers.jsonPath("$[0].name").value(NAME_OF_WALLET_1))
@@ -426,35 +429,6 @@ class WalletControllerTest {
         // then
         assertThat(result.getStatus()).isEqualTo(HttpStatus.OK.value());
         assertThat(result.getContentAsString()).isEqualTo(Collections.emptyList().toString());
-        assertThat(result.getHeader("message")).isEqualTo(EMPTY_LIST_OF_WALLETS_HEADER_MSG);
-    }
-
-    @Test
-    @DisplayName("Should return information about all wallets and http ok status")
-    void shouldReturnListOfAllWallets() throws Exception {
-        // given
-        List<WalletDTO> listOfWalletsDTO = createListOfWalletsDTO();
-        given(walletService.getWallets()).willReturn(listOfWalletsDTO);
-
-        // then
-        mockMvc.perform(get("/api/wallet")
-                        .accept(MediaType.APPLICATION_JSON))
-                .andDo(print())
-                .andExpect(status().isOk())
-                .andExpect(header().string("message", LIST_OF_WALLETS_HEADER_MSG))
-                .andExpect(MockMvcResultMatchers.jsonPath("$.size()").value(3))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(ID_OF_WALLET_1))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[0].name").value(NAME_OF_WALLET_1))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[0].creationDate")
-                        .value(CREATION_DATE_OF_WALLET_1.toString()))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[1].id").value(ID_OF_WALLET_2))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[1].name").value(NAME_OF_WALLET_2))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[1].creationDate")
-                        .value(CREATION_DATE_OF_WALLET_2.toString()))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[2].id").value(ID_OF_WALLET_3))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[2].name").value(NAME_OF_WALLET_3))
-                .andExpect(MockMvcResultMatchers.jsonPath("$[2].creationDate")
-                        .value(CREATION_DATE_OF_WALLET_3.toString()));
     }
 
     /**
@@ -485,7 +459,7 @@ class WalletControllerTest {
                 .content(Objects.requireNonNull(objectMapper.writeValueAsString(walletDTO))));
 
         //then
-        result.andExpect(status().isNoContent());
+        result.andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -518,30 +492,15 @@ class WalletControllerTest {
 
         // then
         result.andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.name").value("Default"))
+                .andExpect(jsonPath("$.name").value(WALLET_TEST_NAME))
                 .andExpect(jsonPath("$.creationDate").value(creationDate.toString()));
-    }
-
-    @Test
-    void shouldThrowWalletNotFoundExceptionWhenWalletByIdDoesNotExist() throws Exception {
-        Instant creationDate = Instant.now();
-        WalletDTO wallet = new WalletDTO(1L, "", creationDate);
-        doThrow(ResourceNotFoundException.class).when(walletService).findById(100L);
-        // when
-
-        ResultActions result = mockMvc.perform(get("/api/wallet/{id}", 100L)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(Objects.requireNonNull(objectMapper.writeValueAsString(wallet))));
-
-        // then
-        result.andExpect(status().isNotFound());
     }
 
     @Test
     void shouldThrowWalletNotFoundExceptionWhenWalletByIdDoesNotExist() throws Exception{
         Instant creationDate = Instant.now();
         WalletDTO wallet = new WalletDTO(ID_OF_WALLET_1, "", creationDate);
-        doThrow(ResourceNotFoundException.class).when(walletService).findById(100L);
+        doThrow(new AppRuntimeException(ErrorCode.W003, "wallet not found")).when(walletService).findById(100L);
         // when
 
         ResultActions result = mockMvc.perform(get("/api/wallet/{id}", 100L)
@@ -564,7 +523,7 @@ class WalletControllerTest {
                 .content(Objects.requireNonNull(objectMapper.writeValueAsString(walletDTO))));
 
         //then
-        result.andExpect(status().isNoContent());
+        result.andExpect(status().is4xxClientError());
     }
 
     @Test
@@ -578,11 +537,10 @@ class WalletControllerTest {
         given(walletService.findAllByNameLikeIgnoreCase(walletNameSearched)).willReturn(foundedWalletsDTO);
 
         // then
-        mockMvc.perform(get("/api/wallet/list/{name}", walletNameSearched)
+        mockMvc.perform(get("/api/wallet/wallets/{name}", walletNameSearched)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(header().string("message", LIST_OF_WALLETS_HEADER_MSG))
                 .andExpect(MockMvcResultMatchers.jsonPath("$.size()").value(foundedWalletsDTO.size()))
                 .andExpect(MockMvcResultMatchers.jsonPath("$[0].id").value(ID_OF_WALLET_2))
                 .andExpect(MockMvcResultMatchers.jsonPath("$[0].name").value(NAME_OF_WALLET_2))
