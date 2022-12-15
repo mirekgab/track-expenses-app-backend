@@ -28,7 +28,6 @@ import java.util.List;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("api/wallet")
-@CrossOrigin
 public class WalletController {
 
     private final WalletService walletService;
